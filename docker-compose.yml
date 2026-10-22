@@ -1,0 +1,58 @@
+services:
+  # ─── Base de datos MariaDB ──────────────────────────────────────────────────
+  mariadb:
+    image: mariadb:10.11
+    container_name: examenes-mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:-root1234}"
+      MARIADB_DATABASE: "${DB_NAME:-examenes_db}"
+      MARIADB_USER: "${DB_USER:-examenes}"
+      MARIADB_PASSWORD: "${DB_PASSWORD:-examenes1234}"
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    ports:
+      # Solo loopback; puerto 3312 para no chocar con otros proyectos.
+      - "127.0.0.1:${DB_HOST_PORT:-3312}:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [examenes-net]
+
+  # ─── Backend Express ────────────────────────────────────────────────────────
+  api:
+    build: { context: ./evaluaciones-api, dockerfile: Dockerfile }
+    container_name: examenes-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: "mysql://${DB_USER:-examenes}:${DB_PASSWORD:-examenes1234}@mariadb:3306/${DB_NAME:-examenes_db}"
+      JWT_SECRET: "${JWT_SECRET:?define JWT_SECRET en .env}"
+      REFRESH_SECRET: "${REFRESH_SECRET:?define REFRESH_SECRET en .env}"
+      CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:8083}"
+      TZ: "UTC"
+    expose: ["3000"]
+    depends_on:
+      mariadb: { condition: service_healthy }
+    networks: [examenes-net]
+
+  # ─── Frontend React/Nginx ───────────────────────────────────────────────────
+  web:
+    build: { context: ./evaluaciones-web, dockerfile: Dockerfile }
+    container_name: examenes-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8083}:80"
+    depends_on: [api]
+    networks: [examenes-net]
+
+volumes:
+  mariadb_data: { driver: local }
+
+networks:
+  examenes-net: { driver: bridge }

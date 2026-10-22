@@ -1,0 +1,267 @@
+// Plataforma de Exámenes en Línea — esquema Prisma (provider mysql, compatible MariaDB 10.6+).
+// Nombres de tabla/columna en español vía @@map/@map. IDs autoincrementales (BigInt).
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Rol {
+  admin
+  profesor
+  estudiante
+}
+
+enum TipoPregunta {
+  opcion_multiple
+  seleccion_multiple
+  verdadero_falso
+  abierta
+}
+
+enum MostrarResultados {
+  nunca
+  al_entregar
+  al_cerrar_examen
+}
+
+enum EstadoExamen {
+  borrador
+  publicado
+  cerrado
+}
+
+enum ModoIntento {
+  examen
+  practica
+}
+
+enum EstadoIntento {
+  en_curso
+  entregado
+  pendiente_revision
+  calificado
+}
+
+enum TipoEventoIntegridad {
+  perdida_foco
+  cambio_pestana
+  salida_pantalla_completa
+  pegado
+}
+
+model Usuario {
+  id            BigInt   @id @default(autoincrement())
+  nombre        String   @db.VarChar(120)
+  email         String   @unique @db.VarChar(190)
+  passwordHash  String   @map("password_hash") @db.VarChar(255)
+  rol           Rol
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now()) @map("creado_en")
+
+  refreshTokens RefreshToken[]
+  cursos        Curso[]        @relation("CursosDelProfesor")
+  inscripciones Inscripcion[]
+  preguntas     Pregunta[]
+  intentos      Intento[]
+
+  @@map("usuarios")
+}
+
+model RefreshToken {
+  id        BigInt   @id @default(autoincrement())
+  usuarioId BigInt   @map("usuario_id")
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique @map("token_hash") @db.Char(64)
+  expiraEn  DateTime @map("expira_en")
+  revocado  Boolean  @default(false)
+
+  @@index([usuarioId])
+  @@map("refresh_tokens")
+}
+
+model Curso {
+  id          BigInt @id @default(autoincrement())
+  nombre      String @db.VarChar(150)
+  profesorId  BigInt @map("profesor_id")
+  profesor    Usuario @relation("CursosDelProfesor", fields: [profesorId], references: [id])
+
+  inscripciones Inscripcion[]
+  preguntas     Pregunta[]
+  examenes      Examen[]
+
+  @@index([profesorId])
+  @@map("cursos")
+}
+
+model Inscripcion {
+  cursoId       BigInt  @map("curso_id")
+  estudianteId  BigInt  @map("estudiante_id")
+  curso         Curso   @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  estudiante    Usuario @relation(fields: [estudianteId], references: [id], onDelete: Cascade)
+
+  @@id([cursoId, estudianteId])
+  @@map("inscripciones")
+}
+
+model Pregunta {
+  id              BigInt       @id @default(autoincrement())
+  cursoId         BigInt       @map("curso_id")
+  autorId         BigInt       @map("autor_id")
+  tipo            TipoPregunta
+  enunciado       String       @db.Text
+  puntaje         Decimal      @default(1) @db.Decimal(6, 2)
+  explicacion     String?      @db.Text
+  respuestaModelo String?      @map("respuesta_modelo") @db.Text
+  version         Int          @default(1)
+  tema            String?      @db.VarChar(100)
+
+  curso    Curso    @relation(fields: [cursoId], references: [id])
+  autor    Usuario  @relation(fields: [autorId], references: [id])
+  opciones Opcion[]
+  examenPreguntas ExamenPregunta[]
+  historial PreguntaHistorial[]
+
+  @@index([cursoId])
+  @@index([autorId])
+  @@index([tipo])
+  @@map("preguntas")
+}
+
+// Copia inmutable del contenido de una pregunta por versión (Req 4.4).
+model PreguntaHistorial {
+  id          BigInt   @id @default(autoincrement())
+  preguntaId  BigInt   @map("pregunta_id")
+  pregunta    Pregunta @relation(fields: [preguntaId], references: [id], onDelete: Cascade)
+  version     Int
+  contenido   Json                       // snapshot: enunciado, tipo, puntaje, opciones, explicaciones
+  creadoEn    DateTime @default(now()) @map("creado_en")
+
+  @@unique([preguntaId, version])
+  @@map("preguntas_historial")
+}
+
+model Opcion {
+  id          BigInt   @id @default(autoincrement())
+  preguntaId  BigInt   @map("pregunta_id")
+  pregunta    Pregunta @relation(fields: [preguntaId], references: [id], onDelete: Cascade)
+  texto       String   @db.Text
+  esCorrecta  Boolean  @default(false) @map("es_correcta")
+  explicacion String?  @db.Text
+  orden       Int      @default(0)
+
+  @@index([preguntaId])
+  @@map("opciones")
+}
+
+model Examen {
+  id                BigInt            @id @default(autoincrement())
+  cursoId           BigInt            @map("curso_id")
+  titulo            String            @db.VarChar(200)
+  instrucciones     String?           @db.Text
+  duracionMin       Int               @map("duracion_min")
+  fechaInicio       DateTime          @map("fecha_inicio")
+  fechaFin          DateTime          @map("fecha_fin")
+  intentosMax       Int               @default(1) @map("intentos_max")
+  aleatorizar       Boolean           @default(false)
+  permitePractica   Boolean           @default(false) @map("permite_practica")
+  mostrarResultados MostrarResultados @default(al_entregar) @map("mostrar_resultados")
+  estado            EstadoExamen      @default(borrador)
+
+  curso           Curso            @relation(fields: [cursoId], references: [id])
+  examenPreguntas ExamenPregunta[]
+  intentos        Intento[]
+
+  @@index([cursoId])
+  @@index([estado])
+  @@map("examenes")
+}
+
+model ExamenPregunta {
+  examenId   BigInt   @map("examen_id")
+  preguntaId BigInt   @map("pregunta_id")
+  orden      Int
+  puntaje    Decimal? @db.Decimal(6, 2)
+  examen     Examen   @relation(fields: [examenId], references: [id], onDelete: Cascade)
+  pregunta   Pregunta @relation(fields: [preguntaId], references: [id])
+
+  @@id([examenId, preguntaId])
+  @@map("examen_preguntas")
+}
+
+model Intento {
+  id            BigInt        @id @default(autoincrement())
+  examenId      BigInt        @map("examen_id")
+  estudianteId  BigInt        @map("estudiante_id")
+  modo          ModoIntento
+  estado        EstadoIntento @default(en_curso)
+  inicio        DateTime
+  finLimite     DateTime?     @map("fin_limite")
+  entregadoEn   DateTime?     @map("entregado_en")
+  calificacion  Decimal?      @db.Decimal(6, 2)
+  ordenSemilla  Int           @map("orden_semilla")
+  ip            String?       @db.VarChar(45)
+  userAgent     String?       @map("user_agent") @db.VarChar(255)
+
+  examen           Examen             @relation(fields: [examenId], references: [id])
+  estudiante       Usuario            @relation(fields: [estudianteId], references: [id])
+  intentoPreguntas IntentoPregunta[]
+  respuestas       Respuesta[]
+  eventos          EventoIntegridad[]
+
+  @@index([examenId, estudianteId, modo])
+  @@index([estado, finLimite])
+  @@map("intentos")
+}
+
+model IntentoPregunta {
+  intentoId  BigInt  @map("intento_id")
+  preguntaId BigInt  @map("pregunta_id")
+  version    Int
+  orden      Int
+  intento    Intento @relation(fields: [intentoId], references: [id], onDelete: Cascade)
+
+  @@id([intentoId, preguntaId])
+  @@map("intento_preguntas")
+}
+
+model Respuesta {
+  intentoId          BigInt   @map("intento_id")
+  preguntaId         BigInt   @map("pregunta_id")
+  opcionesElegidas   Json?    @map("opciones_elegidas")
+  texto              String?  @db.Text
+  esCorrecta         Boolean? @map("es_correcta")
+  puntajeObtenido    Decimal? @map("puntaje_obtenido") @db.Decimal(6, 2)
+  comentarioProfesor String?  @map("comentario_profesor") @db.Text
+  actualizadoEn      DateTime @default(now()) @updatedAt @map("actualizado_en")
+  intento            Intento  @relation(fields: [intentoId], references: [id], onDelete: Cascade)
+
+  @@id([intentoId, preguntaId])
+  @@map("respuestas")
+}
+
+model EventoIntegridad {
+  id         BigInt               @id @default(autoincrement())
+  intentoId  BigInt               @map("intento_id")
+  intento    Intento              @relation(fields: [intentoId], references: [id], onDelete: Cascade)
+  tipo       TipoEventoIntegridad
+  ocurridoEn DateTime             @default(now()) @map("ocurrido_en")
+
+  @@index([intentoId])
+  @@map("eventos_integridad")
+}
+
+model Auditoria {
+  id        BigInt   @id @default(autoincrement())
+  usuarioId BigInt?  @map("usuario_id")
+  accion    String   @db.VarChar(100)
+  detalle   Json?
+  creadoEn  DateTime @default(now()) @map("creado_en")
+
+  @@map("auditoria")
+}
