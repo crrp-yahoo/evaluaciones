@@ -9,6 +9,7 @@ const NAV: NavItem[] = [
   { to: '/preguntas', label: 'Preguntas', roles: ['admin', 'profesor'] },
   { to: '/examenes', label: 'Exámenes', roles: ['admin', 'profesor'] },
   { to: '/mis-examenes', label: 'Mis exámenes', roles: ['estudiante'] },
+  { to: '/practica/estadisticas', label: 'Mi práctica', roles: ['estudiante'] },
 ]
 
 export function Layout() {

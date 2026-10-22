@@ -12,6 +12,7 @@ import ResultadosExamenPage from '../features/resultados/ResultadosExamenPage'
 import MisExamenesPage from '../features/presentar/MisExamenesPage'
 import ExamRunner from '../features/presentar/ExamRunner'
 import PracticeRunner from '../features/practica/PracticeRunner'
+import EstadisticasPractica from '../features/practica/EstadisticasPractica'
 import ResultadoIntentoPage from '../features/resultados/ResultadoIntentoPage'
 
 export function AppRoutes() {
@@ -36,6 +37,7 @@ export function AppRoutes() {
           {/* Estudiante */}
           <Route element={<ProtectedRoute roles={['estudiante']} />}>
             <Route path="/mis-examenes" element={<MisExamenesPage />} />
+            <Route path="/practica/estadisticas" element={<EstadisticasPractica />} />
             <Route path="/intentos/:id" element={<ExamRunner />} />
             <Route path="/practica/:id" element={<PracticeRunner />} />
             <Route path="/intentos/:id/resultado" element={<ResultadoIntentoPage />} />

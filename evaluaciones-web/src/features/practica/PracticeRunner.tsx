@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { http } from '../../api/cliente'
 import type { FeedbackPractica, VistaIntento } from '../../api/tipos'
 import { Boton, Card } from '../../components/ui'
+import { FeedbackPanel } from './FeedbackPanel'
 
 export default function PracticeRunner() {
   const { id = '' } = useParams()
@@ -15,8 +16,37 @@ export default function PracticeRunner() {
   const [fb, setFb] = useState<FeedbackPractica | null>(null)
   const [aciertos, setAciertos] = useState(0)
   const [respondidas, setRespondidas] = useState(0)
+  const [terminado, setTerminado] = useState(false)
+
+  // Repetir solo las preguntas falladas: inicia una nueva práctica con soloFalladas.
+  const repetirFalladas = useMutation({
+    mutationFn: () => http.post<VistaIntento>(`/examenes/${data!.examenId}/intentos`, { modo: 'practica', soloFalladas: true }),
+    onSuccess: (nuevo) => { navigate(`/practica/${nuevo.id}`); window.location.reload() },
+  })
 
   if (isLoading || !data) return <p className="text-slate-500">Cargando práctica…</p>
+
+  if (terminado) {
+    const fallos = respondidas - aciertos
+    return (
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-2xl font-semibold mb-3">Resumen de práctica</h1>
+        <Card className="mb-4">
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div><div className="text-slate-500 text-sm">Respondidas</div><div className="text-2xl font-semibold">{respondidas}</div></div>
+            <div><div className="text-slate-500 text-sm">Aciertos</div><div className="text-2xl font-semibold text-green-700">{aciertos}</div></div>
+            <div><div className="text-slate-500 text-sm">Falladas</div><div className="text-2xl font-semibold text-red-600">{fallos}</div></div>
+          </div>
+        </Card>
+        <div className="flex flex-wrap gap-2">
+          {fallos > 0 && <Boton onClick={() => repetirFalladas.mutate()} disabled={repetirFalladas.isPending}>Repetir falladas</Boton>}
+          <Boton variant="secondary" onClick={() => navigate('/practica/estadisticas')}>Ver estadísticas por tema</Boton>
+          <Boton variant="secondary" onClick={() => navigate('/mis-examenes')}>Volver a mis exámenes</Boton>
+        </div>
+      </div>
+    )
+  }
+
   const p = data.preguntas[idx]
   if (!p) return null
   const multiple = p.tipo === 'seleccion_multiple'
@@ -31,7 +61,7 @@ export default function PracticeRunner() {
   }
   function siguiente() {
     setFb(null); setSel([]); setTexto('')
-    if (esFin) navigate(`/intentos/${id}/resultado`)
+    if (esFin) setTerminado(true)
     else setIdx((i) => i + 1)
   }
   function marcar(opcionId: string) {
@@ -76,18 +106,3 @@ export default function PracticeRunner() {
   )
 }
 
-function FeedbackPanel({ fb }: { fb: FeedbackPractica }) {
-  const correcta = fb.correcta === true
-  const abierta = fb.correcta === null
-  return (
-    <div aria-live="polite" className={`mt-3 rounded-xl p-4 border ${abierta ? 'bg-slate-50 border-slate-200' : correcta ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
-      <div className="font-medium mb-1">{abierta ? 'Respuesta modelo' : correcta ? '✓ ¡Correcto!' : '✗ Incorrecto'}</div>
-      {!abierta && fb.respuestaCorrecta && (
-        <p className="text-sm">Respuesta correcta: <strong>{fb.respuestaCorrecta.map((r) => r.texto).join(', ')}</strong></p>
-      )}
-      {abierta && fb.respuestaModelo && <p className="text-sm">{fb.respuestaModelo}</p>}
-      {fb.explicacion && <p className="text-sm mt-1 text-slate-700">{fb.explicacion}</p>}
-      {fb.explicacionOpcion && <p className="text-sm mt-1 text-slate-600">Sobre tu respuesta: {fb.explicacionOpcion}</p>}
-    </div>
-  )
-}

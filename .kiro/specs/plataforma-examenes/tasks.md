@@ -67,7 +67,7 @@ Cada tarea es incremental y termina con código integrado y probado. Las referen
     - _Requisitos: 4.4_
   - [x] 8.4 Sanitización de HTML en enunciados y explicaciones
     - _Requisitos: 11.1_
-  - [ ] 8.5 Pruebas de integración y de permisos por autor
+  - [x] 8.5 Pruebas de integración y de permisos por autor
     - _Requisitos: 4.6_
 
 - [x] 9. Implementar la creación y configuración de exámenes
@@ -107,7 +107,7 @@ Cada tarea es incremental y termina con código integrado y probado. Las referen
     - _Requisitos: 6.7, 8.1, 8.5_
   - [x] 12.5 Job programado para cerrar intentos vencidos (idempotente)
     - _Requisitos: 6.10_
-  - [ ] 12.6 Pruebas de integración
+  - [x] 12.6 Pruebas de integración
     - Límite de intentos con concurrencia, reanudación, rechazo tras vencimiento, que ninguna respuesta del API exponga `es_correcta`
     - _Requisitos: 6.1–6.7_
 
@@ -121,7 +121,7 @@ Cada tarea es incremental y termina con código integrado y probado. Las referen
     - _Requisitos: 7.7, 9.5_
   - [x] 13.4 Excluir intentos de práctica del conteo de intentos máximos y de los reportes oficiales
     - _Requisitos: 7.2, 7.9_
-  - [ ] 13.5 Pruebas de integración
+  - [x] 13.5 Pruebas de integración
     - **Caso crítico:** un intento de modo examen no puede obtener retroalimentación por `/responder`
     - _Requisitos: 7.3–7.6, 7.9_
 
@@ -136,7 +136,7 @@ Cada tarea es incremental y termina con código integrado y probado. Las referen
     - _Requisitos: 8.3, 8.4_
   - [x] 15.3 Reportes: resumen del examen, acierto por pregunta, detalle de eventos de integridad, exportación CSV
     - _Requisitos: 9.2, 9.3, 9.4, 10.3_
-  - [ ] 15.4 Pruebas de integración
+  - [x] 15.4 Pruebas de integración
     - _Requisitos: 8.4, 9.1–9.4_
 
 ## Fase 5: Frontend
@@ -169,7 +169,7 @@ Cada tarea es incremental y termina con código integrado y probado. Las referen
     - _Requisitos: 6.5, 6.8_
   - [x] 19.4 Detección de cambio de pestaña/pérdida de foco y envío de eventos
     - _Requisitos: 10.2_
-  - [ ] 19.5 Pruebas de componentes (temporizador, autoguardado, cola offline)
+  - [x] 19.5 Pruebas de componentes (temporizador, autoguardado, cola offline)
 
 - [x] 20. Implementar la experiencia de modo práctica
   - [x] 20.1 `PracticeRunner`: una pregunta a la vez, botón **Comprobar**, `FeedbackPanel` (acierto/error, respuesta correcta, explicación) y **Siguiente**

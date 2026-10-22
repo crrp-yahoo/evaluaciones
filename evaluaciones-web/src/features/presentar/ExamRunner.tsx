@@ -4,9 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { http } from '../../api/cliente'
 import type { VistaIntento } from '../../api/tipos'
 import { Boton, Card } from '../../components/ui'
-
-// Clave para la cola local de reconexión (Req 6.8).
-const colaKey = (id: string) => `intento:${id}:respuestas`
+import { formatearTiempo, guardarCola, leerCola, limpiarCola, fusionarRespuestas } from './runnerUtils'
 
 export default function ExamRunner() {
   const { id = '' } = useParams()
@@ -23,12 +21,8 @@ export default function ExamRunner() {
     if (!data) return
     const base: Record<string, string[]> = {}
     for (const r of data.respuestas) base[r.preguntaId] = r.opcionesElegidas
-    // Recupera cola local si existe (reconexión).
-    try {
-      const local = JSON.parse(localStorage.getItem(colaKey(id)) ?? '{}')
-      Object.assign(base, local)
-    } catch { /* ignore */ }
-    setRespuestas(base)
+    // Recupera la cola local si existe (reconexión) — la local tiene prioridad.
+    setRespuestas(fusionarRespuestas(base, leerCola(id)))
     setRestante(data.tiempoRestanteSeg)
   }, [data, id])
 
@@ -41,12 +35,12 @@ export default function ExamRunner() {
   }, [restante]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const guardar = useCallback(async (next: Record<string, string[]>) => {
-    localStorage.setItem(colaKey(id), JSON.stringify(next))
+    guardarCola(id, next)
     setGuardando(true)
     try {
       const payload = Object.entries(next).map(([preguntaId, opcionesElegidas]) => ({ preguntaId: Number(preguntaId), opcionesElegidas }))
       if (payload.length) await http.put(`/intentos/${id}/respuestas`, { respuestas: payload })
-      localStorage.removeItem(colaKey(id)) // confirmado en servidor
+      limpiarCola(id) // confirmado en servidor
     } catch { /* se reintentará; queda en localStorage */ }
     finally { setGuardando(false) }
   }, [id])
@@ -79,8 +73,7 @@ export default function ExamRunner() {
 
   if (isLoading || !data) return <p className="text-slate-500">Cargando intento…</p>
 
-  const mm = restante != null ? String(Math.floor(restante / 60)).padStart(2, '0') : '--'
-  const ss = restante != null ? String(restante % 60).padStart(2, '0') : '--'
+  const tiempo = formatearTiempo(restante)
 
   return (
     <div>
@@ -88,7 +81,7 @@ export default function ExamRunner() {
         <h1 className="text-xl font-semibold">Examen en curso</h1>
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-400">{guardando ? 'Guardando…' : 'Guardado'}</span>
-          <span aria-live="polite" className="font-mono text-lg px-3 py-1 rounded-lg bg-white border">{mm}:{ss}</span>
+          <span aria-live="polite" className="font-mono text-lg px-3 py-1 rounded-lg bg-white border">{tiempo}</span>
         </div>
       </div>
       <div className="space-y-4 mt-3">
